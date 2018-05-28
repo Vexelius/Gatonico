@@ -1,121 +1,307 @@
-/***************************************************
-DFPlayer - A Mini MP3 Player For Arduino
- <https://www.dfrobot.com/index.php?route=product/product&search=mp3&description=true&product_id=1121>
- 
- ***************************************************
- This example shows the basic function of library for DFPlayer.
- 
- Created 2014-8-28
- By [Angelo qiao](Angelo.qiao@dfrobot.com)
- 
- GNU Lesser General Public License.
- See <http://www.gnu.org/licenses/> for details.
- All above must be included in any redistribution
- ****************************************************/
+#include <MD_MAX72xx.h>
+#include <SPI.h>
 
-/***********Notice and Trouble shooting***************
- 1.Connection and Diagram can be found here
- <>
- 2.This code is tested on Arduino Uno, Leonardo, Mega boards.
- ****************************************************/
+// Turn on debug statements to the serial output
+#define  DEBUG  0
 
-#include "Arduino.h"
-#include "SoftwareSerial.h"
-#include "DFRobotDFPlayerMini.h"
+#if  DEBUG
+#define  PRINT(s, x) { Serial.print(F(s)); Serial.print(x); }
+#define PRINTS(x) Serial.print(F(x))
+#define PRINTD(x) Serial.println(x, DEC)
 
-SoftwareSerial mySoftwareSerial(10, 11); // RX, TX
-DFRobotDFPlayerMini myDFPlayer;
-void printDetail(uint8_t type, int value);
+#else
+#define PRINT(s, x)
+#define PRINTS(x)
+#define PRINTD(x)
 
-void setup()
+#endif
+
+// Define the number of devices we have in the chain and the hardware interface
+// NOTE: These pin numbers will probably not work with your hardware and may
+// need to be adapted
+#define MAX_DEVICES 3
+
+#define CLK_PIN   13  // or SCK
+#define DATA_PIN  11  // or MOSI
+#define CS_PIN    10  // or SS
+
+// SPI hardware interface
+MD_MAX72XX mx = MD_MAX72XX(CS_PIN, MAX_DEVICES);
+// Arbitrary pins
+// MD_MAX72XX mx = MD_MAX72XX(DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
+
+// We always wait a bit between updates of the display
+#define  DELAYTIME  100  // in milliseconds
+
+// Sprite set definition
+  uint8_t stdMouth[COL_SIZE] =
+  {
+    0b01100000,
+    0b10010000,
+    0b10000000,
+    0b01000000,
+    0b01000000,
+    0b10000000,
+    0b10010000,
+    0b01100000
+  };
+
+  uint8_t tlkMouth[COL_SIZE] =
+  {
+    0b00100000,
+    0b01010000,
+    0b01000000,
+    0b10100000,
+    0b10100000,
+    0b01000000,
+    0b01010000,
+    0b00100000
+  };
+
+    uint8_t blnkREye[COL_SIZE] =
+  {
+    0b00001100,
+    0b00001110,
+    0b00000110,
+    0b00000110,
+    0b00000110,
+    0b00001100,
+    0b00011000,
+    0b00000000
+  };
+
+    uint8_t blnkLEye[COL_SIZE] =
+  {
+    0b00000000,
+    0b00011000,
+    0b00001100,
+    0b00000110,
+    0b00000110,
+    0b00000110,
+    0b00001110,
+    0b00001100
+  };
+
+    uint8_t idleREye[COL_SIZE] =
+  {
+    0b00000000,
+    0b00111110,
+    0b01111111,
+    0b01100011,
+    0b01111111,
+    0b00111110,
+    0b00000000,
+    0b00000000
+  };
+
+    uint8_t idleLEye[COL_SIZE] =
+  {
+    0b00000000,
+    0b00000000,
+    0b00111110,
+    0b01111111,
+    0b01100011,
+    0b01111111,
+    0b00111110,
+    0b00000000
+  };
+
+    uint8_t hrtREyeA[COL_SIZE] =
+  {
+    0b00000000,
+    0b00001100,
+    0b00011010,
+    0b00111100,
+    0b00011110,
+    0b00001100,
+    0b00000000,
+    0b00000000
+  };
+
+    uint8_t hrtLEyeA[COL_SIZE] =
+  {
+    0b00000000,
+    0b00000000,
+    0b00001100,
+    0b00011110,
+    0b00111100,
+    0b00011010,
+    0b00001100,
+    0b00000000
+  };
+
+    uint8_t hrtREyeB[COL_SIZE] =
+  {
+    0b00001110,
+    0b00011111,
+    0b00110111,
+    0b01111010,
+    0b00110111,
+    0b00011111,
+    0b00001110,
+    0b00000000
+  };
+
+    uint8_t hrtLEyeB[COL_SIZE] =
+  {
+    0b00000000,
+    0b00001110,
+    0b00011111,
+    0b00110111,
+    0b01111010,
+    0b00110111,
+    0b00011111,
+    0b00001110
+  };
+
+    uint8_t hrtMouth[COL_SIZE] =
+  {
+    0b01000000,
+    0b10000000,
+    0b10000000,
+    0b01000000,
+    0b01000000,
+    0b10000000,
+    0b10000000,
+    0b01000000
+  };
+
+    uint8_t sadREye[COL_SIZE] =
+  {
+    0b00011000,
+    0b00111000,
+    0b00110000,
+    0b00110000,
+    0b00110000,
+    0b00011000,
+    0b00001100,
+    0b00000000
+  };
+
+    uint8_t sadLEye[COL_SIZE] =
+  {
+    0b00000000,
+    0b00001100,
+    0b00011000,
+    0b00110000,
+    0b00110000,
+    0b00110000,
+    0b00111000,
+    0b00011000
+  };
+
+    uint8_t sadMoutA[COL_SIZE] =
+  {
+    0b01000000,
+    0b10000000,
+    0b10000000,
+    0b01000000,
+    0b01000000,
+    0b10000000,
+    0b10000000,
+    0b01000000
+  };
+
+    uint8_t sadMoutB[COL_SIZE] =
+  {
+    0b00100000,
+    0b01000000,
+    0b11000000,
+    0b10100000,
+    0b10100000,
+    0b11000000,
+    0b01000000,
+    0b00100000
+  };
+
+
+//  Variables
+int PulseSensorPurplePin = 0;        // Pulse Sensor PURPLE WIRE connected to ANALOG PIN 0
+int Signal;                // holds the incoming raw data. Signal value can range from 0-1024
+int Threshold = 550;            // Determine which Signal to "count as a beat", and which to ingore.
+
+
+// The SetUp Function:
+void setup() {
+  mx.begin();
+  Serial.begin(9600);         // Set's up Serial Communication at certain speed.
+  mx.clear();
+
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, blnkLEye);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, blnkREye);  //Load Right Eye into 3rd led matrix
+  delay(800);
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, blnkLEye);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, tlkMouth);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, blnkREye);  //Load Right Eye into 3rd led matrix
+  delay(500);
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, idleLEye);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, idleREye);  //Load Right Eye into 3rd led matrix
+  delay(500);
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, blnkLEye);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, blnkREye);  //Load Right Eye into 3rd led matrix
+  delay(300);
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, idleLEye);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, idleREye);  //Load Right Eye into 3rd led matrix
+  delay(500);
+  
+  scrollText("Hola!        ");
+
+}
+
+// The Main Loop Function
+void loop() {
+
+  Signal = analogRead(PulseSensorPurplePin);  // Read the PulseSensor's value.
+                                              // Assign this value to the "Signal" variable.
+
+   Serial.println(Signal);                    // Send the Signal value to Serial Plotter.
+
+   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+
+
+   if(Signal > Threshold){                          // If the signal is above "550", then "turn-on" Arduino's on-Board LED.
+     //digitalWrite(LED13,HIGH);
+     //mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, hrtLEyeB);
+     //mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);
+     //mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, hrtREyeB);
+     mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+   } else {
+     //digitalWrite(LED13,LOW);                //  Else, the sigal must be below "550", so "turn-off" this LED.
+     //mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, hrtLEyeA);
+     //mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, hrtMouth);
+     //mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, hrtREyeA);
+     mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+   }
+
+
+delay(10);
+
+
+}
+
+
+// Text scroll function
+void scrollText(char *p)
 {
-  mySoftwareSerial.begin(9600);
-  Serial.begin(115200);
-  
-  Serial.println();
-  Serial.println(F("DFRobot DFPlayer Mini Demo"));
-  Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
-  
-  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
-    Serial.println(F("Unable to begin:"));
-    Serial.println(F("1.Please recheck the connection!"));
-    Serial.println(F("2.Please insert the SD card!"));
-    while(true){
-      delay(0); // Code to compatible with ESP8266 watch dog.
+  uint8_t  charWidth;
+  uint8_t cBuf[8];  // this should be ok for all built-in fonts
+
+  mx.clear();
+
+  while (*p != '\0')
+  {
+    charWidth = mx.getChar(*p++, sizeof(cBuf)/sizeof(cBuf[0]), cBuf);
+
+    for (uint8_t i=0; i<charWidth + 1; i++) // allow space between characters
+    {
+      mx.transform(MD_MAX72XX::TSL);
+      if (i < charWidth)
+        mx.setColumn(0, cBuf[i]);
+      delay(DELAYTIME);
     }
   }
-  Serial.println(F("DFPlayer Mini online."));
-  
-  myDFPlayer.volume(25);  //Set volume value. From 0 to 30
-  myDFPlayer.play(1);  //Play the first mp3
-}
-
-void loop()
-{
-  static unsigned long timer = millis();
-  
-  if (millis() - timer > 12000) {
-    timer = millis();
-    myDFPlayer.next();  //Play next mp3 every 3 second.
-  }
-  
-  if (myDFPlayer.available()) {
-    printDetail(myDFPlayer.readType(), myDFPlayer.read()); //Print the detail message from DFPlayer to handle different errors and states.
-  }
-}
-
-void printDetail(uint8_t type, int value){
-  switch (type) {
-    case TimeOut:
-      Serial.println(F("Time Out!"));
-      break;
-    case WrongStack:
-      Serial.println(F("Stack Wrong!"));
-      break;
-    case DFPlayerCardInserted:
-      Serial.println(F("Card Inserted!"));
-      break;
-    case DFPlayerCardRemoved:
-      Serial.println(F("Card Removed!"));
-      break;
-    case DFPlayerCardOnline:
-      Serial.println(F("Card Online!"));
-      break;
-    case DFPlayerPlayFinished:
-      Serial.print(F("Number:"));
-      Serial.print(value);
-      Serial.println(F(" Play Finished!"));
-      break;
-    case DFPlayerError:
-      Serial.print(F("DFPlayerError:"));
-      switch (value) {
-        case Busy:
-          Serial.println(F("Card not found"));
-          break;
-        case Sleeping:
-          Serial.println(F("Sleeping"));
-          break;
-        case SerialWrongStack:
-          Serial.println(F("Get Wrong Stack"));
-          break;
-        case CheckSumNotMatch:
-          Serial.println(F("Check Sum Not Match"));
-          break;
-        case FileIndexOut:
-          Serial.println(F("File Index Out of Bound"));
-          break;
-        case FileMismatch:
-          Serial.println(F("Cannot Find File"));
-          break;
-        case Advertise:
-          Serial.println(F("In Advertise"));
-          break;
-        default:
-          break;
-      }
-      break;
-    default:
-      break;
-  }
-
 }
