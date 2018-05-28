@@ -216,9 +216,21 @@ MD_MAX72XX mx = MD_MAX72XX(CS_PIN, MAX_DEVICES);
 
 
 //  Variables
-int PulseSensorPurplePin = 0;        // Pulse Sensor PURPLE WIRE connected to ANALOG PIN 0
-int Signal;                // holds the incoming raw data. Signal value can range from 0-1024
-int Threshold = 550;            // Determine which Signal to "count as a beat", and which to ingore.
+#define USE_ARDUINO_INTERRUPTS true    // Set-up low-level interrupts for most acurate BPM math.
+#include <PulseSensorPlayground.h>     // Includes the PulseSensorPlayground Library.   
+
+//  Variables
+const int PulseWire = 0;       // PulseSensor PURPLE WIRE connected to ANALOG PIN 0
+int Threshold = 550;           // Determine which Signal to "count as a beat" and which to ignore.
+                               // Use the "Gettting Started Project" to fine-tune Threshold Value beyond default setting.
+                               // Otherwise leave the default "550" value. 
+
+int BPMCounter = 0;
+int AccurateBPM = 123;
+char BPMTxt[4];
+bool DemoMode = true;
+                               
+PulseSensorPlayground pulseSensor;  // Creates an instance of the PulseSensorPlayground object called "pulseSensor"
 
 
 // The SetUp Function:
@@ -226,6 +238,16 @@ void setup() {
   mx.begin();
   Serial.begin(9600);         // Set's up Serial Communication at certain speed.
   mx.clear();
+
+    // Configure the PulseSensor object, by assigning our variables to it. 
+  pulseSensor.analogInput(PulseWire);   
+  //pulseSensor.blinkOnPulse(LED13);       //auto-magically blink Arduino's LED with heartbeat.
+  pulseSensor.setThreshold(Threshold);   
+
+  // Double-check the "pulseSensor" object was created and "began" seeing a signal. 
+   if (pulseSensor.begin()) {
+    Serial.println("We created a pulseSensor Object !");  //This prints one time at Arduino power-up,  or on Arduino reset.  
+  }
 
   mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, blnkLEye);  //Load Left Eye into 3rd led matrix
   mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
@@ -249,37 +271,89 @@ void setup() {
   delay(500);
   
   scrollText("Hola!        ");
+  mx.clear();
+  
 
 }
 
 // The Main Loop Function
 void loop() {
 
-  Signal = analogRead(PulseSensorPurplePin);  // Read the PulseSensor's value.
-                                              // Assign this value to the "Signal" variable.
+  if(DemoMode == true)
+  {
+      //Blink
+      for(int exptst=0;exptst<3;exptst++)
+      {
+      mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, blnkLEye);  //Load Left Eye into 3rd led matrix
+      mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
+      mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, blnkREye);  //Load Right Eye into 3rd led matrix
+      delay(DELAYTIME*5);
+      mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, idleLEye);  //Load Left Eye into 3rd led matrix
+      mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
+      mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, idleREye);  //Load Right Eye into 3rd led matrix
+  
+      delay(DELAYTIME*10);
+      }
 
-   Serial.println(Signal);                    // Send the Signal value to Serial Plotter.
+      scrollText("Estoy listo!!!         ");
+      DemoMode = false;
+  
+  }
+  else
+  {
+  checkBPM();
+  delay(20);  // considered best practice in a simple sketch.
 
-   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+  if(BPMCounter == 17)
+  {
+  Serial.print("Accurate BPM: ");                        // Print phrase "BPM: " 
+  Serial.println(AccurateBPM);                        // Print the value inside of myBPM. 
 
+  sprintf (BPMTxt, "%03i", AccurateBPM);
+  scrollText(BPMTxt);
+  delay(1200);
+  scrollText("latidos/minuto          ");
+  mx.clear();
 
-   if(Signal > Threshold){                          // If the signal is above "550", then "turn-on" Arduino's on-Board LED.
-     //digitalWrite(LED13,HIGH);
-     //mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, hrtLEyeB);
-     //mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);
-     //mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, hrtREyeB);
-     mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
-   } else {
-     //digitalWrite(LED13,LOW);                //  Else, the sigal must be below "550", so "turn-off" this LED.
-     //mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, hrtLEyeA);
-     //mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, hrtMouth);
-     //mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, hrtREyeA);
-     mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
-   }
+  if(AccurateBPM <= 100)
+  {
+  for(int exptst=0;exptst<3;exptst++)
+    {
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, hrtLEyeA);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, stdMouth);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, hrtREyeA);  //Load Right Eye into 3rd led matrix
+  delay(DELAYTIME*10);
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, hrtLEyeB);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, hrtMouth);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, hrtREyeB);  //Load Right Eye into 3rd led matrix
+  delay(DELAYTIME*10);
+    }
+    scrollText("Hasta pronto!        ");
+    DemoMode = true;
+  }
 
-
-delay(10);
-
+  if(AccurateBPM > 100)
+  {
+  for(int exptst=0;exptst<2;exptst++)
+    {
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, sadLEye);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, sadMoutA);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, sadREye);  //Load Right Eye into 3rd led matrix
+  delay(DELAYTIME*10);
+  mx.setBuffer((1*COL_SIZE)-1, COL_SIZE, sadLEye);  //Load Left Eye into 3rd led matrix
+  mx.setBuffer((2*COL_SIZE)-1, COL_SIZE, sadMoutB);  //Load mouth into 2nd led matrix
+  mx.setBuffer((3*COL_SIZE)-1, COL_SIZE, sadREye);  //Load Right Eye into 3rd led matrix
+  delay(DELAYTIME*10);
+    }
+    scrollText("Necesitas relajarte!        ");
+    DemoMode = true;
+  }
+  
+  
+  BPMCounter = 0;
+  delay(20);
+  }
+  }
 
 }
 
@@ -305,3 +379,23 @@ void scrollText(char *p)
     }
   }
 }
+
+void checkBPM()
+{
+   int myBPM = pulseSensor.getBeatsPerMinute();  // Calls function on our pulseSensor object that returns BPM as an "int".
+                                               // "myBPM" hold this BPM value now. 
+
+if (pulseSensor.sawStartOfBeat()) {            // Constantly test to see if "a beat happened". 
+ Serial.println("♥  A HeartBeat Happened ! "); // If test is "true", print a message "a heartbeat happened". 
+ Serial.print("BPM: ");                        // Print phrase "BPM: " 
+ Serial.println(myBPM);                        // Print the value inside of myBPM.
+ BPMCounter++;
+ if(BPMCounter == 17)
+ {
+  AccurateBPM = myBPM;
+ }
+}
+
+}
+
+
